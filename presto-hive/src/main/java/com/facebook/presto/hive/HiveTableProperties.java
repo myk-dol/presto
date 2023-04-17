@@ -47,6 +47,10 @@ public class HiveTableProperties
     public static final String BUCKETED_BY_PROPERTY = "bucketed_by";
     public static final String BUCKET_COUNT_PROPERTY = "bucket_count";
     public static final String SORTED_BY_PROPERTY = "sorted_by";
+    // add 3 properties here: auto_partition_column, auto_partition_hash_by, auto_partition_list with implementation, also add implementation and tests for all the 3 properties
+    public static final String AUTO_PARTITION_COLUMN = "auto_partition_column";
+    public static final String AUTO_PARTITION_HASH_BY = "auto_partition_hash_by";
+    public static final String AUTO_PARTITION_PERCENT_LIST = "auto_partition_percent_list";
     public static final String ORC_BLOOM_FILTER_COLUMNS = "orc_bloom_filter_columns";
     public static final String ORC_BLOOM_FILTER_FPP = "orc_bloom_filter_fpp";
     public static final String AVRO_SCHEMA_URL = "avro_schema_url";
@@ -116,6 +120,34 @@ public class HiveTableProperties
                                 .map(SortingColumn.class::cast)
                                 .map(SortingColumn::sortingColumnToString)
                                 .collect(toImmutableList())),
+                // implement auto partition column property as string property
+                stringProperty(
+                        AUTO_PARTITION_COLUMN,
+                        "Column used to auto partition",
+                        null,
+                        false),
+                new PropertyMetadata<>(
+                        AUTO_PARTITION_HASH_BY,
+                        "Column(s) used to compute hash for auto partition",
+                        typeManager.getType(parseTypeSignature("array(varchar)")),
+                        List.class,
+                        ImmutableList.of(),
+                        false,
+                        value -> ImmutableList.copyOf(((Collection<?>) value).stream()
+                                .map(name -> ((String) name).toLowerCase(ENGLISH))
+                                .collect(Collectors.toList())),
+                        value -> value),
+                new PropertyMetadata<>(
+                        AUTO_PARTITION_PERCENT_LIST,
+                        "Auto partition percentage list, e.g. 01,05,25,50",
+                        typeManager.getType(parseTypeSignature("array(varchar)")),
+                        List.class,
+                        ImmutableList.of(),
+                        false,
+                        value -> ImmutableList.copyOf(((Collection<?>) value).stream()
+                                .map(name -> ((String) name).toLowerCase(ENGLISH))
+                                .collect(Collectors.toList())),
+                        value -> value),
                 new PropertyMetadata<>(
                         ORC_BLOOM_FILTER_COLUMNS,
                         "ORC Bloom filter index columns",
