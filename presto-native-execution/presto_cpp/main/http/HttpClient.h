@@ -70,6 +70,8 @@ class HttpResponse {
     return std::move(bodyChain_);
   }
 
+  void freeBuffers();
+
   std::string dumpBodyChain() const;
 
  private:
@@ -78,15 +80,6 @@ class HttpResponse {
     VELOX_CHECK(!hasError())
     error_ = exception.what();
     freeBuffers();
-  }
-
-  void freeBuffers() {
-    for (auto& iobuf : bodyChain_) {
-      if (iobuf != nullptr) {
-        pool_->free(iobuf->writableData(), iobuf->capacity());
-      }
-    }
-    bodyChain_.clear();
   }
 
   // Returns the next buffer allocation size given the new request 'dataLength'.
@@ -112,6 +105,8 @@ class HttpClient {
       folly::EventBase* FOLLY_NONNULL eventBase,
       const folly::SocketAddress& address,
       std::chrono::milliseconds timeout,
+      const std::string& clientCertAndKeyPath = "",
+      const std::string& ciphers = "",
       std::function<void(int)>&& reportOnBodyStatsFunc = nullptr);
 
   ~HttpClient();
@@ -126,9 +121,15 @@ class HttpClient {
   folly::EventBase* const eventBase_;
   const folly::SocketAddress address_;
   const folly::HHWheelTimer::UniquePtr timer_;
+  // clientCertAndKeyPath_ Points to a file (usually with pem extension) which
+  // contains certificate and key concatenated together
+  const std::string clientCertAndKeyPath_;
+  // List of ciphers (comma separated) client can use. Note that, to communicate
+  // successfully with server, client needs to have at least one cipher common
+  // with server's cipher list
+  const std::string ciphers_;
   const std::function<void(int)> reportOnBodyStatsFunc_;
   const uint64_t maxResponseAllocBytes_;
-
   std::unique_ptr<proxygen::SessionPool> sessionPool_;
 };
 

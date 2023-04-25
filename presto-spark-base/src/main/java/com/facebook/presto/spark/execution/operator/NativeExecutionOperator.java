@@ -52,7 +52,9 @@ import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -101,6 +103,7 @@ public class NativeExecutionOperator
     private NativeExecutionTask task;
     private CompletableFuture<Void> taskStatusFuture;
     private List<TaskSource> taskSource = new ArrayList<>();
+    private Map<PlanNodeId, List<ScheduledSplit>> splits = new HashMap<>();
     private boolean finished;
 
     private final AtomicReference<NativeExecutionInfo> info = new AtomicReference<>(null);
@@ -213,7 +216,7 @@ public class NativeExecutionOperator
     private void createProcess()
     {
         try {
-            this.process = processFactory.createNativeExecutionProcess(
+            this.process = processFactory.getNativeExecutionProcess(
                     operatorContext.getSession(),
                     URI.create(NATIVE_EXECUTION_SERVER_URI));
             log.info("Starting native execution process of task" + getOperatorContext().getDriverContext().getTaskId().toString());
@@ -271,8 +274,7 @@ public class NativeExecutionOperator
         if (finished) {
             return Optional::empty;
         }
-
-        taskSource.add(new TaskSource(split.getPlanNodeId(), ImmutableSet.of(split), true));
+        splits.computeIfAbsent(split.getPlanNodeId(), key -> new ArrayList<>()).add(split);
 
         return Optional::empty;
     }
@@ -280,6 +282,8 @@ public class NativeExecutionOperator
     @Override
     public void noMoreSplits()
     {
+        // all splits belonging to a single planNodeId should be within a single taskSource
+        splits.forEach((planNodeId, split) -> taskSource.add(new TaskSource(planNodeId, ImmutableSet.copyOf(split), true)));
     }
 
     @Override
@@ -288,10 +292,6 @@ public class NativeExecutionOperator
         systemMemoryContext.setBytes(0);
         if (task != null) {
             task.stop();
-        }
-        if (process != null) {
-            log.info("Closing native execution process for task " + getOperatorContext().getDriverContext().getTaskId().toString());
-            process.close();
         }
     }
 

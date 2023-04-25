@@ -15,6 +15,7 @@
 
 #include <folly/Uri.h>
 
+#include "presto_cpp/main/common/Configs.h"
 #include "presto_cpp/main/http/HttpClient.h"
 #include "velox/common/memory/Memory.h"
 #include "velox/exec/Exchange.h"
@@ -26,7 +27,9 @@ class PrestoExchangeSource : public velox::exec::ExchangeSource {
       const folly::Uri& baseUri,
       int destination,
       std::shared_ptr<velox::exec::ExchangeQueue> queue,
-      velox::memory::MemoryPool* pool);
+      velox::memory::MemoryPool* pool,
+      const std::string& clientCertAndKeyPath_ = "",
+      const std::string& ciphers_ = "");
 
   bool shouldRequestLocked() override;
 
@@ -37,6 +40,10 @@ class PrestoExchangeSource : public velox::exec::ExchangeSource {
       velox::memory::MemoryPool* pool);
 
   void close() override;
+
+  folly::F14FastMap<std::string, int64_t> stats() const override {
+    return {{"prestoExchangeSource.numPages", numPages_}};
+  }
 
   int testingFailedAttempts() const {
     return failedAttempts_;
@@ -50,6 +57,9 @@ class PrestoExchangeSource : public velox::exec::ExchangeSource {
   /// Invoked to get the node-wise queued memory usage from
   /// PrestoExchangeSource.
   static void getMemoryUsage(int64_t& currentBytes, int64_t& peakBytes);
+
+  /// Used by test to clear the node-wise memory usage tracking.
+  static void testingClearMemoryUsage();
 
  private:
   void request() override;
@@ -90,9 +100,13 @@ class PrestoExchangeSource : public velox::exec::ExchangeSource {
   const std::string basePath_;
   const std::string host_;
   const uint16_t port_;
+  const std::string clientCertAndKeyPath_;
+  const std::string ciphers_;
 
   std::unique_ptr<http::HttpClient> httpClient_;
   int failedAttempts_;
+  // The number of pages received from this presto exchange source.
+  uint64_t numPages_{0};
   std::atomic_bool closed_{false};
   // A boolean indicating whether abortResults() call was issued and was
   // successfully processed by the remote server.

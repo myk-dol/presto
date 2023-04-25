@@ -13,7 +13,6 @@
  */
 #pragma once
 
-#include <chrono>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -109,6 +108,11 @@ class SystemConfig : public ConfigBase {
   static constexpr std::string_view kAsyncCacheSsdCheckpointGb{
       "async-cache-ssd-checkpoint-gb"};
   static constexpr std::string_view kAsyncCacheSsdPath{"async-cache-ssd-path"};
+  /// In file systems, such as btrfs, supporting cow (copy on write), the ssd
+  /// cache can use all ssd space and stop working. To prevent that, use this
+  /// option to disable cow for cache files.
+  static constexpr std::string_view kAsyncCacheSsdDisableFileCow{
+      "async-cache-ssd-disable-file-cow"};
   static constexpr std::string_view kEnableSerializedPageChecksum{
       "enable-serialized-page-checksum"};
   static constexpr std::string_view kUseMmapArena{"use-mmap-arena"};
@@ -141,7 +145,7 @@ class SystemConfig : public ConfigBase {
   static constexpr int32_t kHttpExecThreadsDefault = 8;
   static constexpr bool kHttpServerHttpsEnabledDefault = false;
   static constexpr std::string_view kHttpsSupportedCiphersDefault{
-      "AES128-SHA,AES128-SHA256,AES256-GCM-SHA384"};
+      "ECDHE-ECDSA-AES256-GCM-SHA384,AES256-GCM-SHA384"};
   static constexpr int32_t kNumIoThreadsDefault = 30;
   static constexpr int32_t kShutdownOnsetSecDefault = 10;
   static constexpr int32_t kSystemMemoryGbDefault = 40;
@@ -151,6 +155,7 @@ class SystemConfig : public ConfigBase {
   static constexpr uint64_t kAsyncCacheSsdCheckpointGbDefault = 0;
   static constexpr std::string_view kAsyncCacheSsdPathDefault{
       "/mnt/flash/async_cache."};
+  static constexpr bool kAsyncCacheSsdDisableFileCowDefault{false};
   static constexpr std::string_view kShuffleNameDefault{""};
   static constexpr bool kEnableSerializedPageChecksumDefault = true;
   static constexpr bool kEnableVeloxTaskLoggingDefault = false;
@@ -174,13 +179,12 @@ class SystemConfig : public ConfigBase {
 
   // A list of ciphers (comma separated) that are supported by
   // server and client. Note Java and folly::SSLContext use different names to
-  // refer to the same cipher. (guess for different name, Java specific
-  // authentication, key exchange and cipher together and folly just cipher).
-  // For e.g. TLS_RSA_WITH_AES_256_GCM_SHA384 in Java and AES256-GCM-SHA384 in
-  // folly::SSLContext. The ciphers need to enable worker to worker, worker to
-  // coordinator and coordinator to worker communication. Have at least one
-  // cipher suite that is shared for the above 3, otherwise weird failures will
-  // result.
+  // refer to the same cipher. For e.g. TLS_RSA_WITH_AES_256_GCM_SHA384 in Java
+  // and AES256-GCM-SHA384 in folly::SSLContext. More details can be found here:
+  // https://www.openssl.org/docs/manmaster/man1/openssl-ciphers.html. The
+  // ciphers enable worker to worker, worker to coordinator and
+  // coordinator to worker communication. At least one cipher needs to be
+  // shared for the above 3 communication to work.
   std::string httpsSupportedCiphers() const;
 
   // Note: Java packages cert and key in combined JKS file. But CPP requires
@@ -226,6 +230,8 @@ class SystemConfig : public ConfigBase {
   uint64_t localShuffleMaxPartitionBytes() const;
 
   std::string asyncCacheSsdPath() const;
+
+  bool asyncCacheSsdDisableFileCow() const;
 
   std::string shuffleName() const;
 
